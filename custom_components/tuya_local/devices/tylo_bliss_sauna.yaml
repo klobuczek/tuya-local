@@ -1,0 +1,323 @@
+# Tuya Local device profile — Tylö Bliss sauna control
+# Product: d3hy0cu1zqxr28q5, protocol 3.4, device "Sauna Control"
+# Schema obtained 2026-07 from the Thing SDK at runtime (Frida), since the
+# Tylö app cannot be linked to a Tuya cloud project.
+#
+# IMPORTANT: only DPs observed in the live status dump are declared without
+# `optional: true`. DPs 101, 118, 119, 135, 139-153 exist in the schema but are
+# NOT reported by this unit — declaring them non-optional scores the profile 0%
+# and it will not appear in the setup dropdown.
+#
+# SAFETY: the Bliss retains all interlocks (high limit, door switch, factory
+# 60-minute operation mode). DP 11 exposes them as a readable fault bitmap.
+# Bound any automation with DP 113/114 (set_countdown) rather than relying on
+# HA to switch the heater off.
+name: Tylö Bliss sauna control
+products:
+  - id: d3hy0cu1zqxr28q5
+    manufacturer: Tylö
+    model: Bliss Control
+
+entities:
+  # --- Main climate entity: traditional heater, °C ---
+  - entity: climate
+    dps:
+      - id: 1
+        type: boolean
+        name: hvac_mode
+        mapping:
+          - dps_val: false
+            value: "off"
+          - dps_val: true
+            value: heat
+      - id: 122
+        type: integer
+        name: temperature
+        range:
+          min: 48
+          max: 90
+        unit: C
+      - id: 3
+        type: integer
+        name: current_temperature
+      - id: 11
+        type: bitfield
+        name: fault
+        optional: true
+
+  # --- Sauna mode (traditional / infrared) ---
+  - entity: select
+    name: Sauna mode
+    icon: "mdi:radiator"
+    dps:
+      - id: 108
+        type: string
+        name: option
+        mapping:
+          - dps_val: "NONE"
+            value: "Off"
+          - dps_val: "TRAD"
+            value: "Traditional"
+          - dps_val: "IR"
+            value: "Infrared"
+
+  # --- Infrared setpoint (separate range from traditional) ---
+  - entity: number
+    name: Infrared setpoint
+    category: config
+    icon: "mdi:heat-wave"
+    dps:
+      - id: 121
+        type: integer
+        name: value
+        range:
+          min: 28
+          max: 65
+        unit: C
+
+  # --- Bath duration ---
+  - entity: number
+    name: Bath time hours
+    category: config
+    icon: "mdi:timer-sand"
+    dps:
+      - id: 113
+        type: integer
+        name: value
+        range:
+          min: 0
+          max: 24
+  - entity: number
+    name: Bath time minutes
+    category: config
+    icon: "mdi:timer-sand"
+    dps:
+      - id: 114
+        type: integer
+        name: value
+        range:
+          min: 0
+          max: 60
+
+  - entity: sensor
+    name: Time remaining
+    class: duration
+    icon: "mdi:timer-outline"
+    dps:
+      - id: 10
+        type: integer
+        name: sensor
+        unit: min
+
+  # --- Faults / interlocks ---
+  - entity: binary_sensor
+    name: Fault
+    category: diagnostic
+    class: problem
+    dps:
+      - id: 11
+        type: bitfield
+        name: sensor
+        mapping:
+          - dps_val: 0
+            value: false
+          - value: true
+      - id: 11
+        type: bitfield
+        name: fault_code
+
+  # --- Lighting ---
+  - entity: light
+    name: Sauna light
+    dps:
+      - id: 12
+        type: boolean
+        name: switch
+
+  - entity: switch
+    name: Colour light 1
+    dps:
+      - id: 127
+        type: boolean
+        name: switch
+  - entity: number
+    name: Colour light 1 brightness
+    category: config
+    dps:
+      - id: 123
+        type: integer
+        name: value
+        range:
+          min: 0
+          max: 100
+  - entity: switch
+    name: Colour light 1 fade
+    category: config
+    dps:
+      - id: 125
+        type: boolean
+        name: switch
+
+  - entity: switch
+    name: Colour light 2
+    dps:
+      - id: 128
+        type: boolean
+        name: switch
+  - entity: number
+    name: Colour light 2 brightness
+    category: config
+    dps:
+      - id: 124
+        type: integer
+        name: value
+        range:
+          min: 0
+          max: 100
+  - entity: switch
+    name: Colour light 2 fade
+    category: config
+    dps:
+      - id: 126
+        type: boolean
+        name: switch
+
+  # --- Delayed start (appointment) ---
+  - entity: switch
+    name: Delayed start
+    category: config
+    icon: "mdi:clock-start"
+    dps:
+      - id: 102
+        type: boolean
+        name: switch
+  - entity: number
+    name: Delayed start hour
+    category: config
+    dps:
+      - id: 115
+        type: integer
+        name: value
+        range:
+          min: 0
+          max: 24
+  - entity: number
+    name: Delayed start minute
+    category: config
+    dps:
+      - id: 116
+        type: integer
+        name: value
+        range:
+          min: 0
+          max: 59
+  - entity: select
+    name: Delayed start mode
+    category: config
+    dps:
+      - id: 130
+        type: string
+        name: option
+        mapping:
+          - dps_val: "TRAD"
+            value: "Traditional"
+          - dps_val: "IR"
+            value: "Infrared"
+  - entity: number
+    name: Delayed start setpoint
+    category: config
+    dps:
+      - id: 132
+        type: integer
+        name: value
+        range:
+          min: 48
+          max: 90
+        unit: C
+  - entity: number
+    name: Delayed start duration hours
+    category: config
+    dps:
+      - id: 105
+        type: integer
+        name: value
+        range:
+          min: 0
+          max: 24
+  - entity: number
+    name: Delayed start duration minutes
+    category: config
+    dps:
+      - id: 106
+        type: integer
+        name: value
+        range:
+          min: 0
+          max: 60
+
+  # --- Panel settings ---
+  - entity: switch
+    name: Bluetooth
+    category: config
+    icon: "mdi:bluetooth"
+    dps:
+      - id: 103
+        type: boolean
+        name: switch
+  - entity: switch
+    name: Buzzer
+    category: config
+    icon: "mdi:volume-high"
+    dps:
+      - id: 137
+        type: boolean
+        name: switch
+  - entity: switch
+    name: Haptic
+    category: config
+    icon: "mdi:vibrate"
+    dps:
+      - id: 138
+        type: boolean
+        name: switch
+
+  # --- Info / diagnostics ---
+  - entity: sensor
+    name: Hour meter
+    category: diagnostic
+    class: duration
+    icon: "mdi:counter"
+    dps:
+      - id: 136
+        type: integer
+        name: sensor
+        unit: h
+  - entity: sensor
+    name: Brand
+    category: diagnostic
+    dps:
+      - id: 104
+        type: string
+        name: sensor
+  - entity: sensor
+    name: Factory mode
+    category: diagnostic
+    dps:
+      - id: 109
+        type: string
+        name: sensor
+  - entity: sensor
+    name: Operation mode
+    category: diagnostic
+    dps:
+      - id: 110
+        type: string
+        name: sensor
+  - entity: sensor
+    name: Temperature limit mode
+    category: diagnostic
+    dps:
+      - id: 153
+        type: string
+        name: sensor
+        optional: true
