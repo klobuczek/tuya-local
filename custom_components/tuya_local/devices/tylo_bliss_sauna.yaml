@@ -1,25 +1,12 @@
-# Tuya Local device profile — Tylö Bliss sauna control
-# Product: d3hy0cu1zqxr28q5, protocol 3.4, device "Sauna Control"
-# Schema obtained 2026-07 from the Thing SDK at runtime (Frida), since the
-# Tylö app cannot be linked to a Tuya cloud project.
-#
-# IMPORTANT: only DPs observed in the live status dump are declared without
-# `optional: true`. DPs 101, 118, 119, 135, 139-153 exist in the schema but are
-# NOT reported by this unit — declaring them non-optional scores the profile 0%
-# and it will not appear in the setup dropdown.
-#
-# SAFETY: the Bliss retains all interlocks (high limit, door switch, factory
-# 60-minute operation mode). DP 11 exposes them as a readable fault bitmap.
-# Bound any automation with DP 113/114 (set_countdown) rather than relying on
-# HA to switch the heater off.
-name: Tylö Bliss sauna control
+# Tylo Bliss sauna (Sauna360; Tylo/Helo/Finnleo). Schema read from the Tuya
+# OEM app's SDK, as it cannot be linked to a Tuya IoT project. dp 110
+# operation_mode reads 60min on this unit, capping runs at one hour.
+name: Sauna
 products:
   - id: d3hy0cu1zqxr28q5
-    manufacturer: Tylö
-    model: Bliss Control
-
+    manufacturer: Tylo
+    model: Bliss
 entities:
-  # --- Main climate entity: traditional heater, °C ---
   - entity: climate
     dps:
       - id: 1
@@ -33,39 +20,60 @@ entities:
       - id: 122
         type: integer
         name: temperature
+        mapping:
+          - constraint: temperature_unit
+            conditions:
+              - dps_val: F
+                range:
+                  min: 119
+                  max: 194
         range:
           min: 48
           max: 90
-        unit: C
       - id: 3
         type: integer
         name: current_temperature
+      - id: 107
+        type: string
+        name: temperature_unit
+        mapping:
+          - dps_val: C
+            value: C
+          - dps_val: F
+            value: F
       - id: 11
         type: bitfield
         name: fault
         optional: true
-
-  # --- Sauna mode (traditional / infrared) ---
+  - entity: number
+    name: Traditional setpoint F
+    class: temperature
+    category: config
+    hidden: true
+    dps:
+      - id: 111
+        type: integer
+        name: value
+        range:
+          min: 119
+          max: 194
   - entity: select
     name: Sauna mode
-    icon: "mdi:radiator"
     dps:
       - id: 108
         type: string
         name: option
         mapping:
           - dps_val: "NONE"
-            value: "Off"
-          - dps_val: "TRAD"
-            value: "Traditional"
-          - dps_val: "IR"
-            value: "Infrared"
-
-  # --- Infrared setpoint (separate range from traditional) ---
+            value: "off"
+          - dps_val: TRAD
+            value: traditional
+          - dps_val: IR
+            value: infrared
   - entity: number
     name: Infrared setpoint
+    class: temperature
     category: config
-    icon: "mdi:heat-wave"
     dps:
       - id: 121
         type: integer
@@ -73,13 +81,30 @@ entities:
         range:
           min: 28
           max: 65
-        unit: C
-
-  # --- Bath duration ---
+      - id: 107
+        type: string
+        name: unit
+        mapping:
+          - dps_val: C
+            value: C
+          - dps_val: F
+            value: F
+  - entity: number
+    name: Infrared setpoint F
+    class: temperature
+    category: config
+    hidden: true
+    dps:
+      - id: 120
+        type: integer
+        optional: true
+        name: value
+        range:
+          min: 84
+          max: 149
   - entity: number
     name: Bath time hours
     category: config
-    icon: "mdi:timer-sand"
     dps:
       - id: 113
         type: integer
@@ -90,7 +115,6 @@ entities:
   - entity: number
     name: Bath time minutes
     category: config
-    icon: "mdi:timer-sand"
     dps:
       - id: 114
         type: integer
@@ -98,22 +122,17 @@ entities:
         range:
           min: 0
           max: 60
-
   - entity: sensor
     name: Time remaining
     class: duration
-    icon: "mdi:timer-outline"
     dps:
       - id: 10
         type: integer
         name: sensor
         unit: min
-
-  # --- Faults / interlocks ---
   - entity: binary_sensor
-    name: Fault
-    category: diagnostic
     class: problem
+    category: diagnostic
     dps:
       - id: 11
         type: bitfield
@@ -125,15 +144,12 @@ entities:
       - id: 11
         type: bitfield
         name: fault_code
-
-  # --- Lighting ---
   - entity: light
     name: Sauna light
     dps:
       - id: 12
         type: boolean
         name: switch
-
   - entity: switch
     name: Colour light 1
     dps:
@@ -157,7 +173,6 @@ entities:
       - id: 125
         type: boolean
         name: switch
-
   - entity: switch
     name: Colour light 2
     dps:
@@ -181,12 +196,27 @@ entities:
       - id: 126
         type: boolean
         name: switch
-
-  # --- Delayed start (appointment) ---
+  - entity: light
+    name: Colour light 1 colour
+    category: config
+    hidden: true
+    dps:
+      - id: 101
+        type: raw
+        optional: true
+        name: rgbhsv
+  - entity: light
+    name: Colour light 2 colour
+    category: config
+    hidden: true
+    dps:
+      - id: 119
+        type: raw
+        optional: true
+        name: rgbhsv
   - entity: switch
     name: Delayed start
     category: config
-    icon: "mdi:clock-start"
     dps:
       - id: 102
         type: boolean
@@ -219,12 +249,13 @@ entities:
         type: string
         name: option
         mapping:
-          - dps_val: "TRAD"
-            value: "Traditional"
-          - dps_val: "IR"
-            value: "Infrared"
+          - dps_val: TRAD
+            value: traditional
+          - dps_val: IR
+            value: infrared
   - entity: number
     name: Delayed start setpoint
+    class: temperature
     category: config
     dps:
       - id: 132
@@ -233,7 +264,14 @@ entities:
         range:
           min: 48
           max: 90
-        unit: C
+      - id: 107
+        type: string
+        name: unit
+        mapping:
+          - dps_val: C
+            value: C
+          - dps_val: F
+            value: F
   - entity: number
     name: Delayed start duration hours
     category: config
@@ -254,12 +292,45 @@ entities:
         range:
           min: 0
           max: 60
-
-  # --- Panel settings ---
+  - entity: number
+    name: Delayed start setpoint C infrared
+    category: config
+    hidden: true
+    dps:
+      - id: 118
+        type: integer
+        optional: true
+        name: value
+        range:
+          min: 28
+          max: 65
+  - entity: number
+    name: Delayed start setpoint F traditional
+    category: config
+    hidden: true
+    dps:
+      - id: 131
+        type: integer
+        optional: true
+        name: value
+        range:
+          min: 119
+          max: 194
+  - entity: number
+    name: Delayed start setpoint F infrared
+    category: config
+    hidden: true
+    dps:
+      - id: 133
+        type: integer
+        optional: true
+        name: value
+        range:
+          min: 84
+          max: 149
   - entity: switch
     name: Bluetooth
     category: config
-    icon: "mdi:bluetooth"
     dps:
       - id: 103
         type: boolean
@@ -267,7 +338,6 @@ entities:
   - entity: switch
     name: Buzzer
     category: config
-    icon: "mdi:volume-high"
     dps:
       - id: 137
         type: boolean
@@ -275,18 +345,26 @@ entities:
   - entity: switch
     name: Haptic
     category: config
-    icon: "mdi:vibrate"
     dps:
       - id: 138
         type: boolean
         name: switch
-
-  # --- Info / diagnostics ---
+  - entity: select
+    name: Time format
+    category: config
+    dps:
+      - id: 112
+        type: string
+        name: option
+        mapping:
+          - dps_val: 12Hour
+            value: "12 hour"
+          - dps_val: 24Hour
+            value: "24 hour"
   - entity: sensor
     name: Hour meter
-    category: diagnostic
     class: duration
-    icon: "mdi:counter"
+    category: diagnostic
     dps:
       - id: 136
         type: integer
@@ -319,5 +397,5 @@ entities:
     dps:
       - id: 153
         type: string
-        name: sensor
         optional: true
+        name: sensor
